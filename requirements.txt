@@ -1,0 +1,9 @@
+streamlit>=1.30
+pandas>=2.0
+numpy>=1.24
+scikit-learn==1.8.0
+
+# Optional — enables real LLM-generated recommendations in rag_engine.py
+# (set USE_LLM = True in src/rag_engine.py and export ANTHROPIC_API_KEY
+# after installing this)
+# anthropic>=0.25
