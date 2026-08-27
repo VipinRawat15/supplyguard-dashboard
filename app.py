@@ -147,8 +147,8 @@ y_test = bundle["y_test"]
 retriever = load_retriever()
 explainer = load_explainer(fe_tree, bundle["explainer_state"])
 
-worklist = build_worklist(models_saved, fe_tree, X_test_raw, keys_test, y_test)
-_gb_model = models_saved["Gradient Boosting (XGB-substitute)"][0]
+worklist = build_worklist(models_saved["models"], fe_tree, X_test_raw, keys_test, y_test)
+_gb_model = models_saved["models"]["Gradient Boosting (XGB-substitute)"][0]
 
 
 # ----------------------------------------------------------------------
