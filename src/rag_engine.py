@@ -326,9 +326,44 @@ def answer_question(question: str, retriever: PolicyRetriever, risk_level: str =
                      market: str = None, top_drivers: list = None, top_k: int = 3) -> dict:
     """Main entry point for the RAG Decision Assistant page. Shipment
     context (risk_level, proba, shipping_mode, etc.) is optional — a user
-    can ask a general policy question with no shipment selected."""
+    can ask a general policy question with no shipment selected.
+
+    IMPORTANT — off-topic detection uses the QUESTION ALONE, not the
+    combined (question + shipment context) query. Found via live
+    testing: shipment context terms (e.g. "First Class", "COMPLETE")
+    genuinely match real policy content on their own, so an entirely
+    off-topic question (e.g. "What is the capital of France?") asked
+    while a shipment is selected could pass the old combined-query
+    relevance check purely on the strength of the CONTEXT, not the
+    actual question -- meaning the system would answer as if it had
+    found something relevant to what was asked, when really it had only
+    found something relevant to the selected shipment. Checking the
+    question's own relevance separately closes this gap; the combined
+    query is still used for the final answer once we've confirmed the
+    question itself is genuinely on-topic."""
     top_drivers = top_drivers or []
+
+    # Off-topic check: does the QUESTION ALONE match anything in the
+    # policy corpus, independent of any shipment context?
+    question_only_retrieved = retriever.retrieve(question, top_k=top_k)
+    question_is_on_topic = question_only_retrieved["similarity"].max() >= 0.05
+
     query = build_qa_query(question, risk_level, shipping_mode, order_status, market)
+
+    if not question_is_on_topic:
+        # Decline immediately -- don't let shipment context (which may
+        # coincidentally match real policy content) manufacture false
+        # relevance for a question that isn't actually about anything
+        # in the corpus. No override applies here either: if the
+        # question itself is off-topic, shipment status shouldn't change
+        # that.
+        return {
+            "question": question,
+            "query": query,
+            "retrieved_sections": [],
+            "answer": template_answer(question, question_only_retrieved.iloc[0:0]),
+        }
+
     retrieved = retriever.retrieve(query, top_k=top_k)
 
     # Same deterministic override as recommend(): if we know for certain
