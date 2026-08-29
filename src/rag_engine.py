@@ -236,10 +236,30 @@ def build_qa_query(question: str, risk_level: str = None, shipping_mode: str = N
                     order_status: str = None, market: str = None) -> str:
     """Combines the user's free-text question with shipment context (if a
     shipment is currently selected in the dashboard) so retrieval is
-    grounded in both what they asked AND what they're looking at."""
+    grounded in both what they asked AND what they're looking at.
+
+    The question is repeated 2x to weight it more heavily than the
+    appended context terms in the downstream TF-IDF similarity match.
+    (Tuned via live testing: 3x over-corrected and caused a *different*
+    previously-correct case to retrieve the wrong section — 2x was the
+    value that fixed the original bug without breaking that other case;
+    see the regression test in test_pipeline_smoke.py-adjacent manual
+    testing during the final audit.)
+
+    Without this weighting at all, a general question (e.g. "what if an
+    order is suspected of fraud") asked while a shipment with unrelated
+    attributes is selected (e.g. First Class, COMPLETE status) can have
+    its retrieval hijacked by those unrelated but heavily-repeated
+    context terms, burying the actually-relevant policy section below
+    ones that only matched the shipment's attributes, not the question
+    itself. Found via live user testing, not caught by automated tests,
+    which never exercised this specific combination (a general question
+    asked while grounded in a shipment unrelated to that question's
+    topic)."""
     context_parts = [p for p in [risk_level, shipping_mode, order_status, market] if p]
     context_str = " ".join(context_parts)
-    return f"{question} {context_str}".strip()
+    weighted_question = f"{question} {question}"
+    return f"{weighted_question} {context_str}".strip()
 
 
 def template_answer(question: str, retrieved: pd.DataFrame) -> str:
